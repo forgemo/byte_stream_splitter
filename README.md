@@ -24,7 +24,7 @@ Rust library for splitting byte streams.
     
     // The first match contains all bytes until the first seperator sequence is detected (Prefix).
     // The last match contains all bytes starting from the last detected sperator sequence. (Suffix)
-    // All other matches inbetween contain alle the bytes from a seperator sequence until the next one starts.
+    // All other matches inbetween contain all the bytes from a seperator sequence until the next one starts.
     
     // Note: If the stream immediately starts with the seperator, the prefix will still be returnd empty.
 
