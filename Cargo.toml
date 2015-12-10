@@ -1,0 +1,14 @@
+[package]
+name = "byte_stream_splitter"
+version = "0.1.0"
+authors         = ["Mohammed El Batya"]
+description     = "Splitting as stream of bytes by sperator sequence"
+documentation   = "https://github.com/forgemo/byte_stream_splitter/blob/master/README.md"
+homepage        = "https://github.com/forgemo/byte_stream_splitter"
+repository      = "https://github.com/forgemo/byte_stream_splitter"
+readme          = "README.md"
+keywords        = ["split", "byte", "stream", "sequence"]
+license         = "MIT"
+
+
+[dependencies]
