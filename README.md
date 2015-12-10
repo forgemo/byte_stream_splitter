@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/forgemo/byte_stream_splitter.svg?branch=master)](https://travis-ci.org/forgemo/byte_stream_splitter)
+
 # byte_stream_splitter
 Rust library for splitting byte streams.
 
