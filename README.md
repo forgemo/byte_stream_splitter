@@ -1,2 +1,2 @@
-# binary_stream_splitter
-Rust library for splitting binary streams.
+# byte_stream_splitter
+Rust library for splitting byte streams.
