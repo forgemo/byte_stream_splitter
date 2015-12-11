@@ -5,8 +5,8 @@ Rust library for splitting byte streams.
 
 
 ```rust
-    // Prepare your seperator sequence.
-    let sperator = [0x00, 0x00];        
+    // Prepare your separator sequence.
+    let separator = [0x00, 0x00];        
     
     // Prepare your data byte stream.
     // This can be anything implementing the BufRead trait.
@@ -19,16 +19,16 @@ Rust library for splitting byte streams.
         
     // The splitter implements the Iterator trait and can be used as such.
     // You can iteratate through the matches via next() or next_to_buf().
-    // Use next() if you dont care about holding the whole match in memory while searching for the next seperator.
-    // Use next_to_buf() if you want to directly handle the matched bytes while scanning for the next seperator.  
+    // Use next() if you dont care about holding the whole match in memory while searching for the next separator.
+    // Use next_to_buf() if you want to directly handle the matched bytes while scanning for the next separator.  
     
-    // The first match contains all bytes until the first seperator sequence is detected (Prefix).
+    // The first match contains all bytes until the first separator sequence is detected (Prefix).
     // The last match contains all bytes starting from the last detected sperator sequence. (Suffix)
-    // All other matches inbetween contain all the bytes from a seperator sequence until the next one starts.
+    // All other matches inbetween contain all the bytes from a separator sequence until the next one starts.
     
-    // Note: If the stream immediately starts with the seperator, the prefix will still be returnd empty.
+    // Note: If the stream immediately starts with the separator, the prefix will still be returnd empty.
 
-    let mut splitter = ByteStreamSplitter::new(&mut data, &sperator);
+    let mut splitter = ByteStreamSplitter::new(&mut data, &separator);
     let prefix = splitter.next().unwrap().unwrap();
     let match1 = splitter.next().unwrap().unwrap();
     let match2 = splitter.next().unwrap().unwrap();
