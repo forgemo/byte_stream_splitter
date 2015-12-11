@@ -5,7 +5,7 @@ pub struct ByteStreamSplitter<'a> {
     buffer: Vec<u8>,
     match_pointer: usize,
     peek_buffer: Vec<u8>,
-    sperator: &'a [u8],
+    separator: &'a [u8],
     input: &'a mut BufRead,
     started_splitting: bool,
     end_of_stream_reached: bool,
@@ -61,11 +61,11 @@ impl From<io::Error> for SplitError {
 
 
 impl<'a> ByteStreamSplitter<'a> {
-    pub fn new(input: &'a mut BufRead, sperator: &'a [u8]) -> ByteStreamSplitter<'a>{
+    pub fn new(input: &'a mut BufRead, separator: &'a [u8]) -> ByteStreamSplitter<'a>{
         ByteStreamSplitter{
             input: input,
             match_pointer: 0,
-            sperator: sperator,
+            separator: separator,
             buffer: Vec::new(),
             peek_buffer:Vec::new(),
             started_splitting: false,
@@ -74,7 +74,7 @@ impl<'a> ByteStreamSplitter<'a> {
     }
 
     pub fn read_until_next_matching_byte(&mut self) -> io::Result<usize> {
-        self.input.read_until(self.sperator[self.match_pointer], &mut self.buffer)
+        self.input.read_until(self.separator[self.match_pointer], &mut self.buffer)
     }
 
     pub fn next_to_buf(&mut self, output: &mut Write) -> SplitResult<SplitType>{
@@ -97,7 +97,7 @@ impl<'a> ByteStreamSplitter<'a> {
                 1 => {
                     self.peek_buffer.push(self.buffer[0]);
 
-                    if self.match_pointer < self.sperator.len()-1 {
+                    if self.match_pointer < self.separator.len()-1 {
                         self.match_pointer +=1;
                         None
                     }else {
@@ -156,7 +156,7 @@ impl <'a> Iterator for ByteStreamSplitter<'a> {
 
 #[test]
 fn test_with_prefix() {
-    let sperator = [0x00, 0x00];
+    let separator = [0x00, 0x00];
     let mut data = io::Cursor::new(vec![
         0xAA, 0xAB,                     // Prefix
         0x00, 0x00, 0x01, 0x02, 0x03,   // FullMatch
@@ -164,7 +164,7 @@ fn test_with_prefix() {
         0x00, 0x00, 0x07, 0x08          // Suffix
         ]);
 
-    let mut splitter = ByteStreamSplitter::new(&mut data, &sperator);
+    let mut splitter = ByteStreamSplitter::new(&mut data, &separator);
     let prefix = splitter.next().unwrap().unwrap();
     let match1 = splitter.next().unwrap().unwrap();
     let match2 = splitter.next().unwrap().unwrap();
@@ -178,14 +178,14 @@ fn test_with_prefix() {
 
 #[test]
 fn test_without_prefix() {
-    let sperator = [0x00, 0x00];
+    let separator = [0x00, 0x00];
     let mut data = io::Cursor::new(vec![
         0x00, 0x00, 0x01, 0x02, 0x03,   // FullMatch
         0x00, 0x00, 0x04, 0x05, 0x06,   // FullMatch
         0x00, 0x00, 0x07, 0x08          // Suffix
         ]);
 
-    let mut splitter = ByteStreamSplitter::new(&mut data, &sperator);
+    let mut splitter = ByteStreamSplitter::new(&mut data, &separator);
     let prefix = splitter.next().unwrap().unwrap();
     let match1 = splitter.next().unwrap().unwrap();
     let match2 = splitter.next().unwrap().unwrap();
