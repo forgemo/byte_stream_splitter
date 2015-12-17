@@ -1,14 +1,12 @@
-use std::io::{BufWriter, BufRead, Write};
+use std::io::{BufWriter, BufRead, Write, Bytes};
 use std::io;
+use std::collections::VecDeque;
 
-pub struct ByteStreamSplitter<'a> {
-    buffer: Vec<u8>,
-    match_pointer: usize,
-    peek_buffer: Vec<u8>,
+pub struct ByteStreamSplitter<'a,T: 'a> {
     separator: &'a [u8],
-    input: &'a mut BufRead,
+    input: Bytes<T>,
     started_splitting: bool,
-    end_of_stream_reached: bool,
+    end_of_stream_reached: bool
 }
 
 
@@ -60,21 +58,14 @@ impl From<io::Error> for SplitError {
 
 
 
-impl<'a> ByteStreamSplitter<'a> {
-    pub fn new(input: &'a mut BufRead, separator: &'a [u8]) -> ByteStreamSplitter<'a>{
+impl<'a, T> ByteStreamSplitter<'a,T> where T: BufRead + Sized{
+    pub fn new(input: T, separator: &'a [u8]) -> ByteStreamSplitter<'a, T>{
         ByteStreamSplitter{
-            input: input,
-            match_pointer: 0,
+            input: input.bytes(),
             separator: separator,
-            buffer: Vec::new(),
-            peek_buffer:Vec::new(),
             started_splitting: false,
-            end_of_stream_reached: false,
+            end_of_stream_reached: false
         }
-    }
-
-    pub fn read_until_next_matching_byte(&mut self) -> io::Result<usize> {
-        self.input.read_until(self.separator[self.match_pointer], &mut self.buffer)
     }
 
     pub fn next_to_buf(&mut self, output: &mut Write) -> SplitResult<SplitType>{
@@ -83,58 +74,36 @@ impl<'a> ByteStreamSplitter<'a> {
             return Err(SplitError::Io(io::Error::new(io::ErrorKind::InvalidInput, "Stream has no more data.")));
         }
 
-        let mut part_result: Option<SplitType> = Option::None;
-        while part_result.is_none() {
-            let num_bytes = try!(self.read_until_next_matching_byte());
-
-            part_result = match num_bytes {
-                0 => {
-                    self.end_of_stream_reached = true;
-                    try!(output.write_all(&self.peek_buffer));
-                    self.peek_buffer.clear();
-                    Some(SplitType::Suffix)
-                },
-                1 => {
-                    self.peek_buffer.push(self.buffer[0]);
-
-                    if self.match_pointer < self.separator.len()-1 {
-                        self.match_pointer +=1;
-                        None
-                    }else {
-                        self.match_pointer = 0;
-                        if self.started_splitting {
-                            Some(SplitType::FullMatch)
-                        } else {
-                            self.started_splitting = true;
-                            Some(SplitType::Prefix)
-                        }
-                    }
-                },
-                _ => {
-                    try!(output.write_all(&self.peek_buffer));
-                    self.peek_buffer.clear();
-
-                    match self.match_pointer {
-                        0 => {
-                            self.match_pointer+=1;
-                            self.peek_buffer.push(self.buffer[self.buffer.len()-1]);
-                            try!(output.write_all(&self.buffer[..self.buffer.len()-1]));
-                        },
-                        _ => {
-                            self.match_pointer=0;
-                            try!(output.write_all(&self.buffer));
-                        }
-                    }
-                    None
-                }
-            };
-            self.buffer.clear();
+        let mut bytes = VecDeque::new();
+        for b in self.input.by_ref().take(self.separator.len()) {
+            bytes.push_back(try!(b));
         }
-        part_result.ok_or(SplitError::Internal("Scan finished without succeeding or failing. This should never happen!".to_string()))
+        while self.separator.iter().ne(bytes.iter()){
+            let front_byte = try!(bytes.pop_front().ok_or(SplitError::Internal("This should never fail and must be a bug!".to_string())));
+            try!(output.write(&[front_byte]));
+            let next_byte = self.input.by_ref().next();
+            if let Some(r) = next_byte {
+                bytes.push_back(try!(r));
+            }else {
+                self.end_of_stream_reached = true;
+                break;
+            }
+        }
+
+        if self.end_of_stream_reached {
+            try!(output.write_all(&bytes.into_iter().collect::<Vec<_>>()[..]));
+            Ok(SplitType::Suffix)
+        }else if self.started_splitting {
+            Ok(SplitType::FullMatch)
+        }else {
+            self.started_splitting = true;
+            Ok(SplitType::Prefix)
+        }
+
     }
 }
 
-impl <'a> Iterator for ByteStreamSplitter<'a> {
+impl <'a,T> Iterator for ByteStreamSplitter<'a,T> where T: BufRead + Sized{
     type Item = SplitResult<Vec<u8>>;
 
     fn next(&mut self) -> Option<SplitResult<Vec<u8>>> {
@@ -171,9 +140,9 @@ fn test_with_prefix() {
     let suffix = splitter.next().unwrap().unwrap();
 
     assert_eq!(prefix, vec![0xAA, 0xAB]);
-    assert_eq!(match1, vec![0x00, 0x00, 0x01, 0x02, 0x03]);
-    assert_eq!(match2, vec![0x00, 0x00, 0x04, 0x05, 0x06]);
-    assert_eq!(suffix, vec![0x00, 0x00, 0x07, 0x08]);
+    assert_eq!(match1, vec![0x01, 0x02, 0x03]);
+    assert_eq!(match2, vec![0x04, 0x05, 0x06]);
+    assert_eq!(suffix, vec![0x07, 0x08]);
 }
 
 #[test]
@@ -192,7 +161,33 @@ fn test_without_prefix() {
     let suffix = splitter.next().unwrap().unwrap();
 
     assert_eq!(prefix, vec![]);
-    assert_eq!(match1, vec![0x00, 0x00, 0x01, 0x02, 0x03]);
-    assert_eq!(match2, vec![0x00, 0x00, 0x04, 0x05, 0x06]);
-    assert_eq!(suffix, vec![0x00, 0x00, 0x07, 0x08]);
+    assert_eq!(match1, vec![0x01, 0x02, 0x03]);
+    assert_eq!(match2, vec![0x04, 0x05, 0x06]);
+    assert_eq!(suffix, vec![0x07, 0x08]);
+}
+
+#[test]
+fn test_skip_bug() {
+    let separator = [0x00, 0x00];
+    let mut data = io::Cursor::new(vec![
+        0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x00, 0x00, 0x00, 0x04, 0x05, 0x06,
+        0x00, 0x00, 0x07, 0x08
+        ]);
+
+    let mut splitter = ByteStreamSplitter::new(&mut data, &separator);
+    let prefix = splitter.next().unwrap().unwrap();
+    println!("p{:?}", prefix);
+    let match1 = splitter.next().unwrap().unwrap();
+    println!("1m{:?}", match1);
+    let match2 = splitter.next().unwrap().unwrap();
+    println!("1m{:?}", match2);
+    let suffix = splitter.next().unwrap().unwrap();
+    println!("s{:?}", suffix);
+
+
+    assert_eq!(prefix, vec![]);
+    assert_eq!(match1, vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
+    assert_eq!(match2, vec![0x00, 0x04, 0x05, 0x06]);
+    assert_eq!(suffix, vec![0x07, 0x08]);
 }
