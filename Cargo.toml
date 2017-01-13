@@ -1,6 +1,6 @@
 [package]
 name = "byte_stream_splitter"
-version = "0.1.3"
+version = "0.1.4"
 authors         = ["Mohammed El Batya"]
 description     = "Splitting a stream of bytes by separator sequence"
 documentation   = "https://github.com/forgemo/byte_stream_splitter/blob/master/README.md"
@@ -12,3 +12,4 @@ license         = "MIT"
 
 
 [dependencies]
+time = "*"
